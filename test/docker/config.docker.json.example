@@ -1,0 +1,143 @@
+{
+  "//说明": "配置模板：各协议使用其标准默认端口与典型参数。复制为 config.json 后按现场修改。",
+
+  "mqtt": {
+    "broker": "127.0.0.1",
+    "port": 1883,
+    "client_id": "industrial_collector",
+    "username": "",
+    "password": "",
+    "topic_prefix": "factory/line1",
+    "qos": 1,
+    "retain": false,
+    "keepalive": 60
+  },
+
+  "devices": [
+
+    {
+      "id": "modbus_device",
+      "enabled": true,
+      "protocol": "modbus",
+      "reconnect_interval_sec": 5,
+      "modbus": {
+        "host": "127.0.0.1", "port": 502, "unit_id": 1,
+        "timeout": 3, "poll_interval": 1.0,
+        "points": [
+          { "name": "temperature", "address": 0, "func_code": 3,
+            "data_type": "float", "scale": 1.0, "offset": 0.0, "unit": "℃", "description": "温度" }
+        ]
+      }
+    },
+
+    {
+      "id": "iec104_device",
+      "enabled": true,
+      "protocol": "iec104",
+      "reconnect_interval_sec": 5,
+      "iec104": {
+        "host": "127.0.0.1", "port": 2404,
+        "common_address": 1, "poll_interval": 2.0, "timeout": 10,
+        "points": [
+          { "name": "grid_voltage", "ioa": 1001, "type_id": 13,
+            "scale": 1.0, "offset": 0.0, "unit": "V", "description": "电网电压" }
+        ]
+      }
+    },
+
+    {
+      "id": "iec61850_device",
+      "enabled": true,
+      "protocol": "iec61850",
+      "reconnect_interval_sec": 5,
+      "iec61850": {
+        "host": "127.0.0.1", "port": 102,
+        "poll_interval": 1.0, "timeout_ms": 5000,
+        "auth_password": "", "use_reports": false,
+        "points": [
+          { "name": "phase_voltage_a", "object_ref": "MEAS/MMXU1.PhV.phsA.cVal.mag.f",
+            "fc": "MX", "scale": 1.0, "offset": 0.0, "unit": "V", "description": "A相电压" }
+        ]
+      }
+    },
+
+    {
+      "id": "opcua_device",
+      "enabled": true,
+      "protocol": "opcua",
+      "reconnect_interval_sec": 5,
+      "opcua": {
+        "endpoint_url": "opc.tcp://127.0.0.1:4840",
+        "poll_interval": 1.0, "timeout_ms": 5000,
+        "security_policy": "None", "username": "", "password": "",
+        "points": [
+          { "name": "temperature", "node_id": "ns=2;i=1001",
+            "scale": 1.0, "offset": 0.0, "unit": "℃", "description": "温度" }
+        ]
+      }
+    },
+
+    {
+      "id": "dlt645_bus",
+      "enabled": true,
+      "protocol": "dlt645",
+      "reconnect_interval_sec": 5,
+      "dlt645": {
+        "connection_type": "serial",
+        "serial_port": "/dev/ttyUSB0",
+        "baud_rate": 9600,
+        "host": "127.0.0.1", "tcp_port": 20108,
+        "poll_interval": 5.0, "timeout_ms": 3000,
+        "meters": [
+          {
+            "id": "meter_01", "meter_address": "000000000001",
+            "points": [
+              { "name": "total_energy", "data_id": "00010000",
+                "scale": 0.01, "offset": 0.0, "unit": "kWh", "description": "正向有功总电能" }
+            ]
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "dlt698_bus",
+      "enabled": true,
+      "protocol": "dlt698",
+      "reconnect_interval_sec": 5,
+      "dlt698": {
+        "connection_type": "serial",
+        "serial_port": "/dev/ttyUSB0",
+        "baud_rate": 9600,
+        "host": "127.0.0.1", "tcp_port": 20109,
+        "poll_interval": 5.0, "timeout_ms": 5000,
+        "meters": [
+          {
+            "id": "smeter_01", "meter_address": "000000000001",
+            "points": [
+              { "name": "total_energy", "oad": "00200200",
+                "scale": 1.0, "offset": 0.0, "unit": "kWh", "description": "正向有功总电能" }
+            ]
+          }
+        ]
+      }
+    }
+
+  ],
+
+  "cache": {
+    "enabled": true,
+    "db_path": "cache.db",
+    "retention_hours": 24,
+    "max_rows": 1000000,
+    "history_topic": "",
+    "command_topic": "",
+    "replay_rate_ms": 50,
+    "replay_chunk": 200
+  },
+
+  "web": { "port": 8080, "bind": "0.0.0.0", "enabled": true },
+
+  "logging": { "level": "info", "file": "collector.log",
+               "max_bytes": 10485760, "backup_count": 5 }
+}

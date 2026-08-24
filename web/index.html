@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>工业采集管理</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<!-- 顶部导航 -->
+<nav class="main-header">
+  <div class="nav-left">
+    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">☰</button>
+    <span class="brand"><span class="dot" id="sdot"></span>INDUST·COLLECTOR</span>
+  </div>
+  <div class="nav-right">
+    <span id="pbadge" class="badge badge-green">MULTI</span>
+    <span id="clock" class="nav-clock">--:--:--</span>
+  </div>
+</nav>
+
+<div class="wrapper" id="wrapper">
+  <!-- 侧边栏 -->
+  <aside class="sidebar" id="sidebar">
+    <nav class="sidebar-nav">
+      <div class="nav-label">导航</div>
+      <a class="nav-item active" data-page="monitor" onclick="showPage('monitor',this)">
+        <span class="nav-icon">◈</span><span>实时监控</span>
+      </a>
+
+      <div class="nav-label">采集设置</div>
+      <a class="nav-item" data-page="tasks" onclick="showPage('tasks',this)">
+        <span class="nav-icon">⇄</span><span>采集任务</span>
+      </a>
+
+      <div class="nav-label">设备组装</div>
+      <a class="nav-item" data-page="models" onclick="showPage('models',this)">
+        <span class="nav-icon">▣</span><span>设备规格管理</span>
+      </a>
+      <a class="nav-item" data-page="tree" onclick="showPage('tree',this)">
+        <span class="nav-icon">⑃</span><span>设备树</span>
+      </a>
+
+      <div class="nav-label">通讯通道</div>
+      <a class="nav-item" data-page="channels" onclick="showPage('channels',this)">
+        <span class="nav-icon">⇅</span><span>通道管理</span>
+      </a>
+
+      <div class="nav-label">系统</div>
+      <a class="nav-item" data-page="config" onclick="showPage('config',this)">
+        <span class="nav-icon">⚙</span><span>系统设置</span>
+      </a>
+      <a class="nav-item" data-page="logs" onclick="showPage('logs',this)">
+        <span class="nav-icon">≡</span><span>系统日志</span>
+      </a>
+    </nav>
+    <div class="sidebar-stats">
+      <div class="ss-row"><span class="ss-l">Broker</span><span class="ss-v" id="s-broker">—</span></div>
+      <div class="ss-row"><span class="ss-l">设备数</span><span class="ss-v" id="s-devcnt">—</span></div>
+      <div class="ss-row"><span class="ss-l">全局采集</span><span class="ss-v" id="s-gtotal">—</span></div>
+      <div class="ss-row"><span class="ss-l">全局错误</span><span class="ss-v danger" id="s-gerr">—</span></div>
+      <div class="ss-row"><span class="ss-l">全局坏点</span><span class="ss-v" id="s-gbad">—</span></div>
+      <div class="ss-row"><span class="ss-l">全局发布</span><span class="ss-v" id="s-gpub">—</span></div>
+    </div>
+    <div class="sidebar-btns">
+      <button class="btn btn-success btn-block" onclick="ctrl('resume')">▶ 启动采集</button>
+      <button class="btn btn-default btn-block" onclick="ctrl('pause')">⏸ 暂停采集</button>
+      <button class="btn btn-danger btn-block" onclick="confirmStop()">■ 停止程序</button>
+    </div>
+  </aside>
+
+  <!-- 主内容 -->
+  <div class="content-wrapper">
+
+    <!-- ═══ 监控页 ═══ -->
+    <div id="page-monitor" class="page active">
+      <div class="page-header">
+        <h2>实时监控</h2>
+        <div class="page-header-tools">
+          <select id="dsel" class="form-select" onchange="onDevChange()">
+            <option value="">全部设备</option>
+          </select>
+          <span id="ptag" class="badge badge-blue ml-8">—</span>
+          <span id="ptcnt" class="dim ml-8">— 点</span>
+        </div>
+      </div>
+      <div class="page-body">
+        <!-- 信息盒子 -->
+        <div class="info-boxes">
+          <div class="info-box ib-green">
+            <div class="ib-icon">✓</div>
+            <div class="ib-body"><div class="ib-label">成功采集</div><div class="ib-val" id="s-good">—</div></div>
+          </div>
+          <div class="info-box ib-red">
+            <div class="ib-icon">✕</div>
+            <div class="ib-body"><div class="ib-label">错误次数</div><div class="ib-val" id="s-err">—</div></div>
+          </div>
+          <div class="info-box ib-blue">
+            <div class="ib-icon">↑</div>
+            <div class="ib-body"><div class="ib-label">MQTT 发布</div><div class="ib-val" id="s-pub">—</div></div>
+          </div>
+          <!-- <div class="info-box ib-yellow"> -->
+          <div class="info-box ib-green">
+            <div class="ib-icon">◉</div>
+            <div class="ib-body"><div class="ib-label">设备状态</div><div class="ib-val" id="s-st">—</div></div>
+          </div>
+        </div>
+        <!-- 数据点 -->
+        <div class="card">
+          <div class="card-header ch-blue" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <span class="card-title">实时数据点</span>
+            <span class="dim" id="ppos" style="font-size:12px">—</span>
+            <span style="flex:1"></span>
+            <!-- 视图切换：平铺分页 vs 树形下钻。有拓扑的设备（储能站）自动
+                 选树形；平铺设备（Modbus/DLT）保持不变。 -->
+            <div class="btn-group" role="group" style="margin-right:8px" id="vmode-group">
+              <button class="btn btn-sm" id="vm-flat" onclick="setViewMode('flat')">平铺</button>
+              <button class="btn btn-sm" id="vm-tree" onclick="setViewMode('tree')">树形</button>
+            </div>
+            <!-- 平铺模式的分页 -->
+            <label class="dim flat-only" style="font-size:12px">每页
+              <select id="psize" class="form-select form-select-sm" style="margin-left:4px">
+                <option>50</option><option selected>100</option><option>200</option><option>500</option><option>1000</option>
+              </select>
+            </label>
+            <button class="btn btn-sm flat-only" id="pprev" onclick="pageStep(-1)">← 上一页</button>
+            <button class="btn btn-sm flat-only" id="pnext" onclick="pageStep( 1)">下一页 →</button>
+          </div>
+          <!-- 左右布局：树形导航 | 详情面板。ESS 场景（6000+ 节点）下右侧
+               面包屑一路点回上级很累；左侧一直显示可任意跳。平铺设备无拓扑，
+               左边隐掉，右边直接吃满宽度。 -->
+          <div class="split-view">
+            <aside class="tree-only tree-nav-pane" id="tree-nav">
+              <div class="grid-empty" style="padding:12px">加载中…</div>
+            </aside>
+            <div class="split-detail">
+              <!-- 树形模式的面包屑 -->
+              <div id="crumbs" class="tree-only" style="padding:8px 12px;border-bottom:1px solid var(--border);
+                                                        font-size:12px"></div>
+              <!-- 平铺视图：一张 grid -->
+              <div class="grid flat-only" id="grid" style="display:none"><div class="grid-empty">等待数据...</div></div>
+              <!-- 树形视图：本节点自有点位 + 子节点行 -->
+              <div class="tree-only" id="tree-view">
+                <div id="own-block"><div class="grid-empty" style="padding:12px">等待数据...</div></div>
+                <div id="kids-block"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- 趋势图 -->
+        <div class="card">
+          <div class="card-header ch-teal">
+            <span class="card-title">趋势图（最近 60 次）</span>
+            <select id="tsel" class="form-select form-select-sm"><option>—</option></select>
+          </div>
+          <div class="card-body"><canvas id="tc"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ 配置页 ═══ -->
+    <div id="page-config" class="page">
+      <div class="page-header">
+        <h2>配置管理</h2>
+        <span class="dim" style="font-size:12px">MQTT/缓存参数保存后立即生效；设备连接参数重启后生效</span>
+      </div>
+      <div class="page-body">
+        <!-- 基础设置 -->
+        <div class="card">
+          <div class="card-header ch-yellow">
+            <span class="card-title">基础设置</span>
+            <button class="btn btn-sm btn-primary" onclick="cfgSaveBasic()">保存基础设置</button>
+          </div>
+          <div class="card-body">
+            <ul class="tab-nav" id="cfgTabs">
+              <li class="tab-nav-item active" data-tab="tab-mqtt" onclick="switchTab(this,'cfgTabs')">MQTT</li>
+              <li class="tab-nav-item" data-tab="tab-web" onclick="switchTab(this,'cfgTabs')">Web 服务</li>
+              <li class="tab-nav-item" data-tab="tab-cache" onclick="switchTab(this,'cfgTabs')">缓存</li>
+              <li class="tab-nav-item" data-tab="tab-log" onclick="switchTab(this,'cfgTabs')">日志</li>
+            </ul>
+            <!-- MQTT -->
+            <div id="tab-mqtt" class="tab-pane active">
+              <div class="form-row">
+                <div class="form-group fg-4"><label>Broker 地址</label><input class="form-control" id="cfg-mqtt-broker"></div>
+                <div class="form-group fg-1"><label>端口</label><input class="form-control" id="cfg-mqtt-port" type="number"></div>
+                <div class="form-group fg-3"><label>Client ID</label><input class="form-control" id="cfg-mqtt-client_id"></div>
+                <div class="form-group fg-2"><label>用户名</label><input class="form-control" id="cfg-mqtt-username"></div>
+                <div class="form-group fg-2"><label>密码</label><input class="form-control" id="cfg-mqtt-password" type="password"></div>
+                <div class="form-group fg-4"><label>Topic 前缀</label><input class="form-control" id="cfg-mqtt-topic_prefix"></div>
+                <div class="form-group fg-1"><label>QoS</label>
+                  <select class="form-control" id="cfg-mqtt-qos"><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></div>
+                <div class="form-group fg-1"><label>Keepalive(s)</label><input class="form-control" id="cfg-mqtt-keepalive" type="number"></div>
+                <div class="form-group fg-1"><label>Retain</label>
+                  <select class="form-control" id="cfg-mqtt-retain"><option value="false">否</option><option value="true">是</option></select></div>
+              </div>
+            </div>
+            <!-- Web -->
+            <div id="tab-web" class="tab-pane">
+              <div class="form-row">
+                <div class="form-group fg-1"><label>监听端口</label><input class="form-control" id="cfg-web-port" type="number"></div>
+                <div class="form-group fg-2"><label>绑定地址</label><input class="form-control" id="cfg-web-bind"></div>
+                <div class="form-group fg-2"><label>TLS 证书路径</label><input class="form-control" id="cfg-web-tls_cert"></div>
+                <div class="form-group fg-2"><label>TLS 私钥路径</label><input class="form-control" id="cfg-web-tls_key"></div>
+                <div class="form-group fg-1">
+                  <label>启用 TLS</label>
+                  <select class="form-control" id="cfg-web-tls_enabled"><option value="false">否</option><option value="true">是</option></select>
+                </div>
+              </div>
+              <p class="form-hint">TLS 自签证书：<code>bash scripts/gen_cert.sh</code></p>
+              <div class="form-row">
+                <div class="form-group fg-1">
+                  <label>启用鉴权</label>
+                  <select class="form-control" id="cfg-web-auth_enabled"><option value="false">否</option><option value="true">是</option></select>
+                </div>
+                <div class="form-group fg-2"><label>用户名</label><input class="form-control" id="cfg-web-auth_user"></div>
+                <div class="form-group fg-2"><label>密码</label><input class="form-control" id="cfg-web-auth_password" type="password"></div>
+              </div>
+              <p class="form-hint">
+                开启后所有页面与 <code>/api/*</code> 均需 HTTP Basic 认证，<b>保存后重启生效</b>。
+                密码为空则 Web 服务拒绝启动。未开 TLS 时凭据等同明文传输。
+              </p>
+            </div>
+            <!-- Cache -->
+            <div id="tab-cache" class="tab-pane">
+              <div class="form-row">
+                <div class="form-group fg-1">
+                  <label>启用缓存</label>
+                  <select class="form-control" id="cfg-cache-enabled"><option value="true">是</option><option value="false">否</option></select>
+                </div>
+                <div class="form-group fg-2"><label>数据库路径</label><input class="form-control" id="cfg-cache-db_path"></div>
+                <div class="form-group fg-1"><label>保留时长(h)</label><input class="form-control" id="cfg-cache-retention_hours" type="number"></div>
+                <div class="form-group fg-2"><label>最大行数</label><input class="form-control" id="cfg-cache-max_rows" type="number"></div>
+                <div class="form-group fg-3"><label>历史主题</label><input class="form-control" id="cfg-cache-history_topic" placeholder="空=自动"></div>
+                <div class="form-group fg-3"><label>指令主题</label><input class="form-control" id="cfg-cache-command_topic" placeholder="空=自动"></div>
+                <div class="form-group fg-1"><label>回放间隔(ms)</label><input class="form-control" id="cfg-cache-replay_rate_ms" type="number"></div>
+                <div class="form-group fg-1"><label>回放块大小</label><input class="form-control" id="cfg-cache-replay_chunk" type="number"></div>
+              </div>
+            </div>
+            <!-- Log -->
+            <div id="tab-log" class="tab-pane">
+              <div class="form-row">
+                <div class="form-group fg-1">
+                  <label>日志级别</label>
+                  <select class="form-control" id="cfg-log-level">
+                    <option>debug</option><option>info</option><option>warn</option><option>error</option>
+                  </select>
+                </div>
+                <div class="form-group fg-3"><label>日志文件</label><input class="form-control" id="cfg-log-file"></div>
+                <div class="form-group fg-2"><label>单文件大小(B)</label><input class="form-control" id="cfg-log-max_bytes" type="number"></div>
+                <div class="form-group fg-1"><label>备份数</label><input class="form-control" id="cfg-log-backup_count" type="number"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 设备管理 -->
+        <div class="card">
+          <div class="card-header ch-green">
+            <span class="card-title">设备管理</span>
+            <button class="btn btn-sm btn-success" onclick="devAdd()">＋ 添加设备</button>
+          </div>
+          <div class="card-body p-0">
+            <table class="table" id="devTable">
+              <thead><tr>
+                <th>ID</th><th>协议</th><th>地址 / 端口</th><th>点数 / 表数</th><th>轮询(s)</th><th>启用</th><th>操作</th>
+              </tr></thead>
+              <tbody id="devTableBody"><tr><td colspan="7" class="dim tc">加载中...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ 采集任务页 ═══ -->
+    <!-- 一个任务 = 一个连接 + 一个协议 + 一个调度周期 = 一个采集线程。
+         设备树的点位挂到任务上，一条 Modbus 连接可喂几千个点。 -->
+    <div id="page-tasks" class="page">
+      <div class="page-header">
+        <h2>采集任务</h2>
+        <div class="page-header-tools">
+          <button class="btn btn-primary btn-sm" onclick="taskNew()">+ 新建任务</button>
+          <button class="btn btn-default btn-sm" onclick="tasksLoad()">刷新</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body">
+          <div class="hint" id="tasksHint">
+            任务承载「连接与调度」；测点归属设备树。修改任务不影响正在运行的采集，
+            需到设备树点「生效」后才切换（编译流程待 P2 上线）。
+          </div>
+          <div class="table-wrap"><table class="tbl" id="tasksTbl"></table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ 设备规格页 ═══ -->
+    <!-- 模板：属性 + 数据点 + 子规格组合。组合以结构化方式存储，
+         PACK001.CELL001024 这类名字只是显示，不用于还原结构。 -->
+    <div id="page-models" class="page">
+      <div class="page-header">
+        <h2>设备规格管理</h2>
+        <div class="page-header-tools">
+          <button class="btn btn-primary btn-sm" onclick="modelNew()">+ 新建设备规格</button>
+          <button class="btn btn-default btn-sm" onclick="modelsLoad()">刷新</button>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><h3>规格列表</h3></div>
+          <div class="card-body">
+            <div class="table-wrap"><table class="tbl" id="modelsTbl"></table></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3 id="modelDetailTitle">规格详情</h3></div>
+          <div class="card-body" id="modelDetail">
+            <div class="empty">从左侧选择一个设备规格</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ 设备树页 ═══ -->
+    <!-- 设备规格的实例化。节点 id 为代理主键、path 为派生列：
+         改名只重写子树 path，点位与快照的引用不受影响。 -->
+    <div id="page-tree" class="page">
+      <div class="page-header">
+        <h2>设备树</h2>
+        <div class="page-header-tools">
+          <button class="btn btn-success btn-sm" onclick="doCompile()">⚙ 生效（编译）</button>
+          <button class="btn btn-primary btn-sm" onclick="treeNewRoot()">+ 根节点</button>
+          <a class="btn btn-default btn-sm" href="/api/tree/csv">导出 CSV</a>
+          <button class="btn btn-default btn-sm" onclick="document.getElementById('csvFile').click()">导入 CSV</button>
+          <input type="file" id="csvFile" accept=".csv" style="display:none" onchange="treeImportCsv(this)">
+          <button class="btn btn-default btn-sm" onclick="treeLoad()">刷新</button>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><h3>树结构</h3></div>
+          <div class="card-body">
+            <div class="hint">
+              CSV 每个测点一行，可在 Excel 里按公式批量填地址。导入为全量替换，
+              校验不通过则原树不变。<br>
+              改完设备规格或设备树后点<b>「生效」</b>编译成点表；采集器需以
+              <code>--from-db</code> 启动才会按编译结果采集。
+            </div>
+            <div id="treeView" class="tree-view"><div class="empty">加载中…</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3 id="nodeDetailTitle">节点详情</h3></div>
+          <div class="card-body" id="nodeDetail">
+            <div class="empty">从左侧选择一个节点</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ 通讯通道页 ═══ -->
+    <div id="page-channels" class="page">
+      <div class="page-header">
+        <h2>通讯通道</h2>
+        <div class="page-header-tools">
+          <button class="btn btn-primary btn-sm" onclick="chanNew()">+ 新建通道</button>
+          <button class="btn btn-default btn-sm" onclick="chansLoad()">刷新</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body">
+          <div class="hint">
+            <b>当前的 MQTT 上报仍在「系统设置 → MQTT」页配置</b>，不在此处 ——
+            同一份 MQTT 配置若两个页面都能写，改完这边看似保存成功、实际不生效。
+            待 P3 引入真正的多通道（Kafka / 文件 / 下行控制）时，会把 MQTT 一并
+            迁到本页并同时撤掉那个页签。穿网闸为后续 TODO。
+          </div>
+          <div class="table-wrap"><table class="tbl" id="chansTbl"></table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ 日志页 ═══ -->
+    <div id="page-logs" class="page">
+      <div class="page-header">
+        <h2>系统日志</h2>
+        <label class="dim" style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="lauto" checked> 自动滚动
+        </label>
+      </div>
+      <div class="page-body">
+        <div class="card">
+          <div class="card-body p-0">
+            <div class="log-box" id="lc"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- content-wrapper -->
+</div><!-- wrapper -->
+
+<!-- ═══ 设备编辑 Modal ═══ -->
+<div class="modal-overlay" id="devModal" style="display:none">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-header">
+      <h4 id="devModalTitle">编辑设备</h4>
+      <button class="modal-close" onclick="devModalClose()">×</button>
+    </div>
+    <div class="modal-body">
+      <!-- 基础字段 -->
+      <div class="form-row">
+        <div class="form-group fg-4">
+          <label>设备 ID <span class="required">*</span></label>
+          <input class="form-control" id="dev-id" placeholder="唯一标识，如 modbus_plc1">
+        </div>
+        <div class="form-group fg-3">
+          <label>协议</label>
+          <select class="form-control" id="dev-protocol" onchange="devProtoChange()">
+            <option value="modbus">Modbus TCP</option>
+            <option value="iec104">IEC 60870-5-104</option>
+            <option value="iec61850">IEC 61850 MMS</option>
+            <option value="opcua">OPC UA</option>
+            <option value="dlt645">DL/T 645-2007</option>
+            <option value="dlt698">DL/T 698.45</option>
+            <option value="can">CAN / CAN FD</option>
+          </select>
+        </div>
+        <div class="form-group fg-2">
+          <label>重连间隔(s)</label>
+          <input class="form-control" id="dev-reconnect" type="number" value="5">
+        </div>
+        <div class="form-group fg-2" style="align-self:flex-end;padding-bottom:4px">
+          <label><input type="checkbox" id="dev-enabled" checked> 启用</label>
+        </div>
+      </div>
+
+      <!-- 协议参数区（JS 切换显示） -->
+      <div id="proto-modbus" class="proto-section">
+        <div class="section-title">Modbus TCP 连接参数</div>
+        <div class="form-row">
+          <div class="form-group fg-4"><label>主机地址</label><input class="form-control" id="modbus-host" value="127.0.0.1"></div>
+          <div class="form-group fg-2"><label>端口</label><input class="form-control" id="modbus-port" type="number" value="502"></div>
+          <div class="form-group fg-2"><label>Unit ID</label><input class="form-control" id="modbus-unit_id" type="number" value="1"></div>
+          <div class="form-group fg-2"><label>超时(s)</label><input class="form-control" id="modbus-timeout" type="number" value="3"></div>
+          <div class="form-group fg-2"><label>轮询(s)</label><input class="form-control" id="modbus-poll_interval" type="number" step="0.1" value="1.0"></div>
+        </div>
+      </div>
+
+      <div id="proto-iec104" class="proto-section" style="display:none">
+        <div class="section-title">IEC 104 连接参数</div>
+        <div class="form-row">
+          <div class="form-group fg-4"><label>主机地址</label><input class="form-control" id="iec104-host" value="127.0.0.1"></div>
+          <div class="form-group fg-2"><label>端口</label><input class="form-control" id="iec104-port" type="number" value="2404"></div>
+          <div class="form-group fg-2"><label>公共地址</label><input class="form-control" id="iec104-common_address" type="number" value="1"></div>
+          <div class="form-group fg-2"><label>超时(s)</label><input class="form-control" id="iec104-timeout" type="number" value="10"></div>
+          <div class="form-group fg-2"><label>轮询(s)</label><input class="form-control" id="iec104-poll_interval" type="number" step="0.1" value="2.0"></div>
+        </div>
+      </div>
+
+      <div id="proto-iec61850" class="proto-section" style="display:none">
+        <div class="section-title">IEC 61850 MMS 连接参数</div>
+        <div class="form-row">
+          <div class="form-group fg-4"><label>主机地址</label><input class="form-control" id="iec61850-host" value="127.0.0.1"></div>
+          <div class="form-group fg-2"><label>端口</label><input class="form-control" id="iec61850-port" type="number" value="102"></div>
+          <div class="form-group fg-2"><label>超时(ms)</label><input class="form-control" id="iec61850-timeout_ms" type="number" value="5000"></div>
+          <div class="form-group fg-2"><label>轮询(s)</label><input class="form-control" id="iec61850-poll_interval" type="number" step="0.1" value="1.0"></div>
+          <div class="form-group fg-3"><label>认证密码</label><input class="form-control" id="iec61850-auth_password" type="password"></div>
+          <div class="form-group fg-2">
+            <label>使用报告</label>
+            <select class="form-control" id="iec61850-use_reports"><option value="false">否</option><option value="true">是</option></select>
+          </div>
+        </div>
+      </div>
+
+      <div id="proto-opcua" class="proto-section" style="display:none">
+        <div class="section-title">OPC UA 连接参数</div>
+        <div class="form-row">
+          <div class="form-group fg-6"><label>Endpoint URL</label><input class="form-control" id="opcua-endpoint_url" value="opc.tcp://127.0.0.1:4840"></div>
+          <div class="form-group fg-2"><label>超时(ms)</label><input class="form-control" id="opcua-timeout_ms" type="number" value="5000"></div>
+          <div class="form-group fg-2"><label>轮询(s)</label><input class="form-control" id="opcua-poll_interval" type="number" step="0.1" value="1.0"></div>
+          <div class="form-group fg-3"><label>安全策略</label><input class="form-control" id="opcua-security_policy" value="None"></div>
+          <div class="form-group fg-2"><label>用户名</label><input class="form-control" id="opcua-username"></div>
+          <div class="form-group fg-2"><label>密码</label><input class="form-control" id="opcua-password" type="password"></div>
+        </div>
+      </div>
+
+      <div id="proto-can" class="proto-section" style="display:none">
+        <div class="section-title">CAN 接口参数</div>
+        <div class="form-row">
+          <div class="form-group fg-3"><label>网络接口</label><input class="form-control" id="can-interface" value="can0"></div>
+          <div class="form-group fg-2">
+            <label>CAN FD</label>
+            <select class="form-control" id="can-fd"><option value="false">否（经典 CAN）</option><option value="true">是（64 字节）</option></select>
+          </div>
+          <div class="form-group fg-2"><label>上报周期(s)</label><input class="form-control" id="can-poll_interval" type="number" step="0.1" value="1.0"></div>
+          <div class="form-group fg-3"><label>帧有效期(ms)</label><input class="form-control" id="can-stale_timeout_ms" type="number" value="5000"></div>
+        </div>
+        <div class="dim" style="font-size:11px;margin-top:-4px">
+          被动监听：按 CAN ID 缓存最新帧，超过帧有效期未更新的信号标记为 BAD（0 = 永不过期）。
+          比特率需先由系统拉起接口，例如 <code>ip link set can0 up type can bitrate 500000</code>。
+        </div>
+      </div>
+
+      <!-- DLT645 / DLT698 共用总线参数 -->
+      <div id="proto-dlt" class="proto-section" style="display:none">
+        <div class="section-title">总线连接参数</div>
+        <div class="form-row">
+          <div class="form-group fg-2">
+            <label>连接方式</label>
+            <select class="form-control" id="dlt-connection_type" onchange="dltConnChange()">
+              <option value="tcp">TCP 网关</option>
+              <option value="serial">串口</option>
+            </select>
+          </div>
+          <div class="form-group fg-3" id="dlt-tcp-host-group"><label>TCP 主机</label><input class="form-control" id="dlt-host" value="127.0.0.1"></div>
+          <div class="form-group fg-2" id="dlt-tcp-port-group"><label>TCP 端口</label><input class="form-control" id="dlt-tcp_port" type="number" value="20108"></div>
+          <div class="form-group fg-3" id="dlt-serial-group" style="display:none"><label>串口设备</label><input class="form-control" id="dlt-serial_port" value="/dev/ttyUSB0"></div>
+          <div class="form-group fg-2" id="dlt-baud-group" style="display:none"><label>波特率</label><input class="form-control" id="dlt-baud_rate" type="number" value="9600"></div>
+          <div class="form-group fg-2"><label>超时(ms)</label><input class="form-control" id="dlt-timeout_ms" type="number" value="3000"></div>
+          <div class="form-group fg-2"><label>轮询(s)</label><input class="form-control" id="dlt-poll_interval" type="number" step="0.5" value="5.0"></div>
+        </div>
+      </div>
+
+      <!-- 采集点 / 电表 区域 -->
+      <div class="section-title" style="margin-top:16px">
+        <span id="points-section-title">采集点</span>
+        <button class="btn btn-sm btn-success" style="float:right" id="addPointBtn" onclick="pointAdd()">＋ 添加点</button>
+      </div>
+      <div id="points-container"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-default" onclick="devModalClose()">取消</button>
+      <button class="btn btn-primary" onclick="devSave()">保存设备</button>
+    </div>
+  </div>
+</div>
+
+<!-- 进度条 -->
+<div id="rbar"></div>
+
+<script src="/assets/app.js"></script>
+<script src="/assets/config.js"></script>
+<script src="/assets/model.js"></script>
+</body>
+</html>

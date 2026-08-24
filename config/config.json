@@ -1,0 +1,208 @@
+{
+  "mqtt": {
+    "broker": "192.168.1.100",
+    "port": 1883,
+    "client_id": "industrial_collector_01",
+    "username": "",
+    "password": "",
+    "topic_prefix": "factory/line1",
+    "qos": 1,
+    "retain": false,
+    "keepalive": 60
+  },
+
+  "devices": [
+
+    {
+      "id": "plc_line1",
+      "enabled": true,
+      "protocol": "modbus",
+      "modbus": {
+        "host": "192.168.1.200", "port": 502, "unit_id": 1,
+        "timeout": 3, "poll_interval": 1.0,
+        "points": [
+          { "name": "temperature", "address": 0, "func_code": 3,
+            "data_type": "float", "scale": 0.1, "offset": 0.0, "unit": "℃", "description": "炉温" },
+          { "name": "pressure",    "address": 2, "func_code": 3,
+            "data_type": "float", "scale": 0.01, "offset": 0.0, "unit": "MPa", "description": "管道压力" },
+          { "name": "pump_speed",  "address": 4, "func_code": 3,
+            "data_type": "uint16", "scale": 1.0, "offset": 0.0, "unit": "rpm", "description": "泵转速" }
+        ]
+      }
+    },
+
+    {
+      "id": "rtu_substation",
+      "enabled": true,
+      "protocol": "iec104",
+      "iec104": {
+        "host": "192.168.1.201", "port": 2404,
+        "common_address": 1, "poll_interval": 2.0, "timeout": 10,
+        "points": [
+          { "name": "grid_voltage", "ioa": 1001, "type_id": 13,
+            "scale": 1.0, "offset": 0.0, "unit": "V", "description": "电网电压" },
+          { "name": "grid_current", "ioa": 1002, "type_id": 13,
+            "scale": 1.0, "offset": 0.0, "unit": "A", "description": "电网电流" }
+        ]
+      }
+    },
+
+    {
+      "id": "smart_substation",
+      "enabled": false,
+      "protocol": "iec61850",
+      "iec61850": {
+        "host": "192.168.1.202", "port": 102,
+        "poll_interval": 1.0, "timeout_ms": 5000,
+        "auth_password": "", "use_reports": false,
+        "points": [
+          { "name": "phase_voltage_a", "object_ref": "MEAS/MMXU1.PhV.phsA.cVal.mag.f",
+            "fc": "MX", "scale": 1.0, "offset": 0.0, "unit": "V", "description": "A相电压" }
+        ]
+      }
+    },
+
+    {
+      "id": "scada_server",
+      "enabled": false,
+      "protocol": "opcua",
+      "opcua": {
+        "endpoint_url": "opc.tcp://192.168.1.203:4840",
+        "poll_interval": 1.0, "timeout_ms": 5000,
+        "security_policy": "None", "username": "", "password": "",
+        "points": [
+          { "name": "motor_speed", "node_id": "ns=2;s=MotorSpeed",
+            "scale": 1.0, "offset": 0.0, "unit": "rpm", "description": "电机转速" }
+        ]
+      }
+    },
+
+    {
+      "id": "rs485_bus_1",
+      "enabled": true,
+      "protocol": "dlt645",
+      "dlt645": {
+        "connection_type": "serial",
+        "serial_port": "/dev/ttyUSB0",
+        "baud_rate": 9600,
+        "poll_interval": 5.0,
+        "timeout_ms": 3000,
+        "meters": [
+          {
+            "id": "meter_01",
+            "meter_address": "000000000001",
+            "points": [
+              { "name": "total_energy", "data_id": "00010000",
+                "scale": 0.01, "offset": 0.0, "unit": "kWh", "description": "正向有功总电能" },
+              { "name": "voltage_a",    "data_id": "02010100",
+                "scale": 0.1,  "offset": 0.0, "unit": "V",   "description": "A相电压" },
+              { "name": "current_a",    "data_id": "02020100",
+                "scale": 0.001,"offset": 0.0, "unit": "A",   "description": "A相电流" }
+            ]
+          },
+          {
+            "id": "meter_02",
+            "meter_address": "000000000002",
+            "points": [
+              { "name": "total_energy", "data_id": "00010000",
+                "scale": 0.01, "offset": 0.0, "unit": "kWh", "description": "正向有功总电能" },
+              { "name": "active_power", "data_id": "02030000",
+                "scale": 0.0001,"offset": 0.0, "unit": "kW", "description": "瞬时总有功功率" }
+            ]
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "tcp_gw_meters",
+      "enabled": true,
+      "protocol": "dlt698",
+      "dlt698": {
+        "connection_type": "tcp",
+        "host": "192.168.1.204",
+        "tcp_port": 20108,
+        "poll_interval": 5.0,
+        "timeout_ms": 5000,
+        "meters": [
+          {
+            "id": "smart_meter_01",
+            "meter_address": "000000000011",
+            "points": [
+              { "name": "total_energy", "oad": "00200200",
+                "scale": 0.01, "offset": 0.0, "unit": "kWh", "description": "正向有功总电能" },
+              { "name": "voltage_a",    "oad": "02010100",
+                "scale": 0.1,  "offset": 0.0, "unit": "V",   "description": "A相电压" },
+              { "name": "active_power", "oad": "03010100",
+                "scale": 0.0001,"offset": 0.0, "unit": "kW", "description": "有功功率" }
+            ]
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "bms_can",
+      "enabled": false,
+      "protocol": "can",
+      "reconnect_interval_sec": 5,
+      "can": {
+        "interface": "can0",
+        "fd": false,
+        "poll_interval": 1.0,
+        "stale_timeout_ms": 5000,
+        "signals": [
+          { "name": "pack_voltage", "can_id": "0x180", "start_bit": 0,  "bit_length": 16,
+            "byte_order": "little", "is_signed": false,
+            "scale": 0.1, "offset": 0.0, "unit": "V", "description": "电池组总电压" },
+          { "name": "pack_current", "can_id": "0x180", "start_bit": 16, "bit_length": 16,
+            "byte_order": "little", "is_signed": true,
+            "scale": 0.1, "offset": 0.0, "unit": "A", "description": "电池组电流（放电为负）" },
+          { "name": "soc",          "can_id": "0x180", "start_bit": 32, "bit_length": 8,
+            "byte_order": "little", "is_signed": false,
+            "scale": 0.4, "offset": 0.0, "unit": "%", "description": "荷电状态" },
+          { "name": "fault_flag",   "can_id": "0x180", "start_bit": 40, "bit_length": 1,
+            "byte_order": "little", "is_signed": false,
+            "scale": 1.0, "offset": 0.0, "unit": "", "description": "故障标志位" }
+        ]
+      }
+    },
+
+    {
+      "id": "pcs_canfd",
+      "enabled": false,
+      "protocol": "canfd",
+      "reconnect_interval_sec": 5,
+      "can": {
+        "interface": "can1",
+        "poll_interval": 1.0,
+        "stale_timeout_ms": 3000,
+        "signals": [
+          { "name": "grid_power",  "can_id": "0x18FF50E5", "extended": true,
+            "start_bit": 7,  "bit_length": 16, "byte_order": "big", "is_signed": true,
+            "scale": 0.5, "offset": 0.0, "unit": "kW", "description": "并网有功功率" },
+          { "name": "dc_bus_volt", "can_id": "0x18FF50E5", "extended": true,
+            "start_bit": 23, "bit_length": 16, "byte_order": "big", "is_signed": false,
+            "scale": 0.1, "offset": 0.0, "unit": "V", "description": "直流母线电压" }
+        ]
+      }
+    }
+
+  ],
+
+  "web": {
+    "port": 15688,
+    "bind": "0.0.0.0",
+    "enabled": true,
+    "auth_enabled": false,
+    "auth_user": "admin",
+    "auth_password": ""
+  },
+
+  "logging": {
+    "level": "info",
+    "file": "collector.log",
+    "max_bytes": 10485760,
+    "backup_count": 5
+  }
+}

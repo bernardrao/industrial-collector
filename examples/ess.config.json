@@ -1,0 +1,35 @@
+{
+  "_comment": "储能站示例实例的配置。devices[] 故意留空 —— 采集内容全部来自 config.db 的编译快照，所以【必须加 --from-db 启动】，否则没有任何设备会被采集。配套：bash examples/ess_models.sh 建规格与设备树，模拟器 test/docker/simulators/ess_modbus_sim.py（宿主机 15650）。",
+  "web": {
+    "enabled": true,
+    "bind": "0.0.0.0",
+    "port": 15688,
+    "debug": false
+  },
+  "mqtt": {
+    "broker": "127.0.0.1",
+    "port": 15640,
+    "client_id": "ic_ess_station",
+    "topic_prefix": "ess/station",
+    "qos": 0,
+    "retain": false,
+    "keepalive": 60
+  },
+  "cache": {
+    "enabled": false,
+    "db_path": "cache_ess.db",
+    "retention_hours": 24,
+    "max_rows": 1000000,
+    "history_topic": "ess/station/history",
+    "command_topic": "ess/station/cmd/replay",
+    "replay_rate_ms": 50,
+    "replay_chunk": 200
+  },
+  "logging": {
+    "level": "info",
+    "file": "ess_collector.log",
+    "max_bytes": 10485760,
+    "backup_count": 3
+  },
+  "devices": []
+}

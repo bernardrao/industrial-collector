@@ -1,0 +1,331 @@
+{
+  "mqtt": {
+    "broker": "127.0.0.1",
+    "port": 15640,
+    "client_id": "ic_docker_test",
+    "topic_prefix": "test/docker",
+    "qos": 1,
+    "retain": false,
+    "keepalive": 60
+  },
+  "devices": [
+    {
+      "id": "modbus_sim",
+      "enabled": true,
+      "protocol": "modbus",
+      "modbus": {
+        "host": "127.0.0.1",
+        "port": 15641,
+        "unit_id": 1,
+        "timeout": 3,
+        "poll_interval": 1.0,
+        "points": [
+          {
+            "name": "temperature",
+            "address": 0,
+            "func_code": 3,
+            "data_type": "float",
+            "scale": 0.1,
+            "unit": "℃",
+            "description": "炉温"
+          },
+          {
+            "name": "pressure",
+            "address": 2,
+            "func_code": 3,
+            "data_type": "float",
+            "scale": 0.01,
+            "unit": "MPa",
+            "description": "压力"
+          },
+          {
+            "name": "pump_speed",
+            "address": 4,
+            "func_code": 3,
+            "data_type": "uint16",
+            "scale": 1.0,
+            "unit": "rpm",
+            "description": "泵转速"
+          }
+        ]
+      }
+    },
+    {
+      "id": "iec104_sim",
+      "enabled": true,
+      "protocol": "iec104",
+      "iec104": {
+        "host": "127.0.0.1",
+        "port": 15642,
+        "common_address": 1,
+        "poll_interval": 2.0,
+        "timeout": 10,
+        "points": [
+          {
+            "name": "grid_voltage",
+            "ioa": 1001,
+            "type_id": 13,
+            "scale": 1.0,
+            "unit": "V",
+            "description": "电网电压"
+          },
+          {
+            "name": "grid_current",
+            "ioa": 1002,
+            "type_id": 13,
+            "scale": 1.0,
+            "unit": "A",
+            "description": "电网电流"
+          }
+        ]
+      }
+    },
+    {
+      "id": "iec61850_srv",
+      "enabled": true,
+      "protocol": "iec61850",
+      "reconnect_interval_sec": 5,
+      "iec61850": {
+        "host": "127.0.0.1",
+        "port": 15646,
+        "poll_interval": 1.0,
+        "timeout_ms": 5000,
+        "auth_password": "",
+        "use_reports": false,
+        "points": [
+          {
+            "name": "analog_in_1",
+            "object_ref": "simpleIOGenericIO/GGIO1.AnIn1.mag.f",
+            "fc": "MX",
+            "scale": 1.0,
+            "offset": 0.0,
+            "unit": "",
+            "description": "模拟量1(sin)"
+          },
+          {
+            "name": "analog_in_2",
+            "object_ref": "simpleIOGenericIO/GGIO1.AnIn2.mag.f",
+            "fc": "MX",
+            "scale": 1.0,
+            "offset": 0.0,
+            "unit": "",
+            "description": "模拟量2(sin)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "opcua_sim",
+      "enabled": true,
+      "protocol": "opcua",
+      "opcua": {
+        "endpoint_url": "opc.tcp://127.0.0.1:15643/freeopcua/server/",
+        "poll_interval": 1.0,
+        "timeout_ms": 5000,
+        "security_policy": "None",
+        "points": [
+          {
+            "name": "temperature",
+            "node_id": "ns=2;s=Temperature",
+            "scale": 1.0,
+            "unit": "℃",
+            "description": "温度"
+          },
+          {
+            "name": "pressure",
+            "node_id": "ns=2;s=Pressure",
+            "scale": 1.0,
+            "unit": "bar",
+            "description": "压力"
+          },
+          {
+            "name": "motor_speed",
+            "node_id": "ns=2;s=MotorSpeed",
+            "scale": 1.0,
+            "unit": "rpm",
+            "description": "电机转速"
+          }
+        ]
+      }
+    },
+    {
+      "id": "dlt645_gw",
+      "enabled": true,
+      "protocol": "dlt645",
+      "dlt645": {
+        "connection_type": "tcp",
+        "host": "127.0.0.1",
+        "tcp_port": 15644,
+        "poll_interval": 3.0,
+        "timeout_ms": 3000,
+        "meters": [
+          {
+            "id": "meter_01",
+            "meter_address": "000000000001",
+            "points": [
+              {
+                "name": "total_energy",
+                "data_id": "00010000",
+                "scale": 0.01,
+                "unit": "kWh",
+                "description": "总电能"
+              },
+              {
+                "name": "voltage_a",
+                "data_id": "02010100",
+                "scale": 0.1,
+                "unit": "V",
+                "description": "A相电压"
+              },
+              {
+                "name": "current_a",
+                "data_id": "02020100",
+                "scale": 0.001,
+                "unit": "A",
+                "description": "A相电流"
+              },
+              {
+                "name": "active_power",
+                "data_id": "02030000",
+                "scale": 0.0001,
+                "unit": "kW",
+                "description": "有功功率"
+              },
+              {
+                "name": "power_factor",
+                "data_id": "02060000",
+                "scale": 0.001,
+                "unit": "",
+                "description": "功率因数"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "dlt698_gw",
+      "enabled": true,
+      "protocol": "dlt698",
+      "dlt698": {
+        "connection_type": "tcp",
+        "host": "127.0.0.1",
+        "tcp_port": 15645,
+        "poll_interval": 3.0,
+        "timeout_ms": 5000,
+        "meters": [
+          {
+            "id": "smeter_01",
+            "meter_address": "000000000001",
+            "points": [
+              {
+                "name": "total_energy",
+                "oad": "00200200",
+                "scale": 1.0,
+                "unit": "kWh",
+                "description": "总电能"
+              },
+              {
+                "name": "voltage_a",
+                "oad": "02010100",
+                "scale": 1.0,
+                "unit": "V",
+                "description": "A相电压"
+              },
+              {
+                "name": "current_a",
+                "oad": "02040100",
+                "scale": 1.0,
+                "unit": "A",
+                "description": "A相电流"
+              },
+              {
+                "name": "active_power",
+                "oad": "03010100",
+                "scale": 1.0,
+                "unit": "kW",
+                "description": "有功功率"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "dlt645_serial",
+      "enabled": true,
+      "protocol": "dlt645",
+      "dlt645": {
+        "connection_type": "serial",
+        "poll_interval": 3.0,
+        "timeout_ms": 3000,
+        "meters": [
+          {
+            "id": "meter_01",
+            "meter_address": "000000000001",
+            "points": [
+              {
+                "name": "total_energy",
+                "data_id": "00010000",
+                "scale": 0.01,
+                "unit": "kWh",
+                "description": "总电能"
+              },
+              {
+                "name": "voltage_a",
+                "data_id": "02010100",
+                "scale": 0.1,
+                "unit": "V",
+                "description": "A相电压"
+              },
+              {
+                "name": "current_a",
+                "data_id": "02020100",
+                "scale": 0.001,
+                "unit": "A",
+                "description": "A相电流"
+              },
+              {
+                "name": "active_power",
+                "data_id": "02030000",
+                "scale": 0.0001,
+                "unit": "kW",
+                "description": "有功功率"
+              },
+              {
+                "name": "power_factor",
+                "data_id": "02060000",
+                "scale": 0.001,
+                "unit": "",
+                "description": "功率因数"
+              }
+            ]
+          }
+        ],
+        "serial_port": "/tmp/ic_ttyDLT645",
+        "baud_rate": 9600
+      }
+    }
+  ],
+  "cache": {
+    "enabled": true,
+    "db_path": "cache.db",
+    "retention_hours": 24,
+    "max_rows": 1000000,
+    "history_topic": "test/docker/history",
+    "command_topic": "test/docker/cmd/replay",
+    "replay_rate_ms": 50,
+    "replay_chunk": 200
+  },
+  "web": {
+    "port": 15647,
+    "bind": "0.0.0.0",
+    "enabled": true
+  },
+  "logging": {
+    "level": "info",
+    "file": "collector.log",
+    "max_bytes": 10485760,
+    "backup_count": 5
+  }
+}

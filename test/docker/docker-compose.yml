@@ -1,0 +1,36 @@
+# 工业采集程序 —— 独立测试环境
+#
+# 设计：采集器（industrial_collector）跑在【宿主机】，本 compose 只起
+#       MQTT broker + 各协议模拟器，全部通过 published 端口暴露到 127.0.0.1。
+#       采集器用 test/docker/config.docker.json 连接 127.0.0.1:<port>，
+#       不污染主环境，也无需把采集器本身打进镜像。
+#
+# 用法：
+#   cd test/docker
+#   docker compose up -d --build
+#   # 回到项目根，用本目录的配置启动采集器：
+#   ./build/industrial_collector test/docker/config.docker.json
+#   docker compose down
+
+services:
+  mqtt:
+    build:
+      context: .
+      dockerfile: Dockerfile.mqtt
+    container_name: ic_test_mqtt
+    ports:
+      - "127.0.0.1:15640:1883"
+
+  simulators:
+    build: .
+    container_name: ic_sims
+    depends_on:
+      - mqtt
+    # 主机端口收进 15640-15650 区间（容器内端口不变）
+    ports:
+      - "127.0.0.1:15641:1502"    # Modbus TCP
+      - "127.0.0.1:15642:2404"    # IEC 60870-5-104
+      - "127.0.0.1:15643:15643"   # OPC UA（内外同端口，避免 endpoint 重写）
+      - "127.0.0.1:15644:20108"   # DLT645 TCP 网关
+      - "127.0.0.1:15645:20109"   # DLT698 TCP 网关
+      - "127.0.0.1:15650:1503"    # 储能站 Modbus（11541 点，给设备树用）

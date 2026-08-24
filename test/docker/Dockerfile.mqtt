@@ -1,0 +1,3 @@
+FROM eclipse-mosquitto:2
+# 将配置 COPY 进镜像（走构建上下文，避免 bind-mount 的主机路径问题）
+COPY mosquitto.conf /mosquitto/config/mosquitto.conf

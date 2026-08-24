@@ -1,0 +1,20 @@
+third_party/
+build/
+build-*/
+dist/
+*.json.tmp
+*.db
+*.db-shm
+*.db-wal
+collector.log
+
+# 运行时日志 / pid
+*_collector.log
+.codegraph/daemon.pid
+
+# 本地开发环境专属，官方约定不追踪
+.claude/settings.local.json
+
+# 编译产物（源码在 test/iec61850_server/*.c，二进制是构建结果）
+test/iec61850_server/iec61850_server
+.codegraph/
