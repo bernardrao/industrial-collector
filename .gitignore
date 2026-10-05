@@ -18,3 +18,5 @@ collector.log
 # 编译产物（源码在 test/iec61850_server/*.c，二进制是构建结果）
 test/iec61850_server/iec61850_server
 .codegraph/
+collector*.log
+ess_collector*.log

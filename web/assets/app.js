@@ -354,6 +354,7 @@ function cellHtml(p) {
 function kidRowHtml(k) {
   const leaf = k.child_count === 0;
   const model = k.model ? `<span class="kid-model">${esc(k.model)}</span>` : '';
+  // const more  = leaf ? '' : `<span class="kid-more">▸ 下钻</span>`; // rox 
   const more  = leaf ? '' : `<span class="kid-more">▸ 下钻</span>`;
   const kvs = k.points.slice(0, 6).map(p => {
     const short = p.name.split('/').pop();

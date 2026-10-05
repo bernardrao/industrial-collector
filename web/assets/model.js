@@ -360,6 +360,169 @@ async function nodeDel(id) {
   catch (e) { fail(e); }
 }
 
+// ── 设备树右键菜单 ─────────────────────────────────────────────────────────
+// 挂在 treeView 的 contextmenu 上一次委托：右键节点 → 弹菜单，点条目 → 分派
+// 到对应的既有函数（addChild / instantiate / rename / delete）+ 新的编辑属性。
+// 阻止浏览器默认菜单是必须的；不阻止的话在 Firefox / Chrome 上都会盖住这个。
+let _ctxId = null;   // 当前右键的节点 id
+
+function ctxMenuHide() {
+  const m = document.getElementById('ctxMenu');
+  if (m) m.style.display = 'none';
+  document.querySelectorAll('.tree-node.ctx-target').forEach(e => e.classList.remove('ctx-target'));
+  _ctxId = null;
+}
+
+function treeCtxMenu(ev) {
+  const row = ev.target.closest('.tree-node');
+  if (!row) return;      // 右键落在空白，走浏览器默认菜单
+  ev.preventDefault();
+  const id = parseInt(row.dataset.id, 10);
+  if (!id) return;
+  _ctxId = id;
+  row.classList.add('ctx-target');
+  const m = document.getElementById('ctxMenu');
+  m.style.display = 'block';
+  // 菜单可能超出视窗右下 —— 计算 clientX/Y 加菜单尺寸后夹到视口内
+  const w = m.offsetWidth, h = m.offsetHeight;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const x = Math.min(ev.clientX, vw - w - 4);
+  const y = Math.min(ev.clientY, vh - h - 4);
+  m.style.left = Math.max(4, x) + 'px';
+  m.style.top  = Math.max(4, y) + 'px';
+}
+
+function ctxMenuAction(act) {
+  const id = _ctxId;
+  ctxMenuHide();
+  if (!id) return;
+  switch (act) {
+    case 'edit':        return nodeEditOpen(id);
+    case 'addChild':    return nodeAddChild(id);
+    case 'instantiate': return nodeInstantiate(id);
+    case 'rename':      return nodeRename(id);
+    case 'delete':      return nodeDel(id);
+  }
+}
+
+// 挂事件：treeView 一路都是 innerHTML 重建，不能给 .tree-node 挂各自的 handler，
+// 委托到容器即可。此函数**立即执行 + 幂等**：DOMContentLoaded 是不是已经触发过
+// 都无所谓（旧代码里那种"只在 DOMContentLoaded 里挂一次"的写法，会被浏览器缓
+// 存了老 JS 的用户命中一次坑 —— 重启服务、hard-reload 之前 JS 里没这段代码，
+// 而 hard-reload 后 DOMContentLoaded 早就走过了，事件永不挂上）。
+function _setupTreeCtxMenu() {
+  const tv = document.getElementById('treeView');
+  if (tv && !tv.dataset.ctxWired) {
+    tv.addEventListener('contextmenu', treeCtxMenu);
+    tv.dataset.ctxWired = '1';
+    // 一次性小提示，方便在 DevTools Console 里判断"到底是不是新版本"
+    if (window.console) console.info('[tree] 右键菜单已就绪（v2）');
+  }
+  const menu = document.getElementById('ctxMenu');
+  if (menu && !menu.dataset.ctxWired) {
+    menu.addEventListener('click', ev => {
+      const it = ev.target.closest('.ctx-item');
+      if (it && !it.classList.contains('disabled')) ctxMenuAction(it.dataset.act);
+    });
+    menu.dataset.ctxWired = '1';
+  }
+  if (!document.body.dataset.ctxGlobalWired) {
+    document.addEventListener('click', ev => {
+      if (!ev.target.closest('#ctxMenu')) ctxMenuHide();
+    });
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape') ctxMenuHide(); });
+    window.addEventListener('scroll', ctxMenuHide, true);
+    window.addEventListener('resize', ctxMenuHide);
+    document.body.dataset.ctxGlobalWired = '1';
+  }
+}
+// 立即尝试挂；若 body 还没有（极少数场景）等 DOMContentLoaded 再挂
+if (document.body) _setupTreeCtxMenu();
+else document.addEventListener('DOMContentLoaded', _setupTreeCtxMenu);
+
+// ── 编辑节点属性对话框 ──────────────────────────────────────────────────────
+// 把 name / model / meta 三个字段放一处编辑。code 也放这里，改动会走 rename
+// 分支（后端 renameNode 重写子树 path）—— 单独开一个"改名"入口只是为了跟旧
+// 按钮兼容。
+function nodeEditOpen(id) {
+  const n = _nodeCache.get(id);
+  if (!n) return alert('节点不在缓存里，刷新后再试');
+  document.getElementById('ne-path').value  = n.path;
+  document.getElementById('ne-code').value  = n.code || n.path.split('.').pop();
+  document.getElementById('ne-name').value  = n.name || '';
+  document.getElementById('ne-model').value = n.model || '';
+  // meta 是对象，编辑时铺平成 key=value 每行一条。数字保持字面，字符串原样。
+  const meta = n.meta || {};
+  const metaTxt = Object.keys(meta).map(k => {
+    const v = meta[k];
+    return k + '=' + (v == null ? '' : String(v));
+  }).join('\n');
+  document.getElementById('ne-meta').value = metaTxt;
+  document.getElementById('nodeEditModal').dataset.id = id;
+  document.getElementById('nodeEditModal').style.display = 'flex';
+  // 首个可编辑字段获得焦点，键盘也能改
+  setTimeout(() => document.getElementById('ne-code').focus(), 30);
+}
+
+function nodeEditClose() {
+  document.getElementById('nodeEditModal').style.display = 'none';
+}
+
+// key=value 每行解析成对象。数字（含负、含小数）自动识别；其他一律字符串
+// —— 别搞成 JSON.parse("false") 之类的隐式类型转换，那会让 meter_address
+// "000000000001" 变成 int 1 掉前导零。
+function parseMeta(txt) {
+  const out = {};
+  for (const raw of txt.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const eq = line.indexOf('=');
+    if (eq < 0) throw new Error('第 "' + line + '" 行缺少 = 号');
+    const k = line.slice(0, eq).trim();
+    const v = line.slice(eq + 1).trim();
+    if (!k) throw new Error('空 key（=" ' + v + '"）');
+    // "字面往返" 判定是否可安全当数字：Number(v) 得转回原样字符串。
+    // 这样 "000000000001" → 1 但 String(1)!=="000000000001" → 保留字符串，
+    // DLT meter_address 那种保留前导零的场景不会被吃掉。
+    const num = Number(v);
+    if (v !== '' && !Number.isNaN(num) && String(num) === v) out[k] = num;
+    else                                                    out[k] = v;
+  }
+  return out;
+}
+
+async function nodeEditSave() {
+  const id = parseInt(document.getElementById('nodeEditModal').dataset.id, 10);
+  if (!id) return;
+  const n = _nodeCache.get(id) || {};
+
+  const code  = document.getElementById('ne-code').value.trim();
+  const name  = document.getElementById('ne-name').value;
+  const model = document.getElementById('ne-model').value.trim();
+
+  let meta;
+  try { meta = parseMeta(document.getElementById('ne-meta').value); }
+  catch (e) { return alert('元数据解析失败：\n' + e.message); }
+
+  // 组请求体：只发【改了】的字段。全量发也没问题，但让后端日志清爽点。
+  const body = {};
+  if (code  !== n.code)  body.code  = code;
+  if (name  !== (n.name  || '')) body.name  = name;
+  if (model !== (n.model || '')) body.model = model || null;
+  const oldMeta = n.meta || {};
+  if (JSON.stringify(meta) !== JSON.stringify(oldMeta)) body.meta = meta;
+  if (!Object.keys(body).length) { nodeEditClose(); return; }
+
+  try {
+    await api('PUT', '/api/tree/node/' + id, body);
+    nodeEditClose();
+    treeLoad();
+    // 如果详情面板正打开的是这个节点，也刷新
+    if (document.getElementById('nodeDetailTitle').textContent === n.path)
+      setTimeout(() => nodeShow(id), 200);
+  } catch (e) { fail(e); }
+}
+
 async function treeImportCsv(input) {
   const f = input.files && input.files[0];
   if (!f) return;

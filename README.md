@@ -55,8 +55,110 @@ nano config/config.json
 # 4. 运行
 ./build/industrial_collector config/config.json
 
-# 5. 浏览器打开 Web 管理界面（Admin 风格）
-#    http://<设备IP>:8080
+# 5. 浏览器打开 Web 管理界面
+#    http://<设备IP>:15688      （端口来自 config.json 的 web.port）
+```
+
+---
+
+## 启动与停止
+
+三种启动场景，按需选。
+
+### 场景一：单实例，最普通
+
+配置文件里 `devices[]` 直接写死，跟 v1.x 完全一样：
+
+```bash
+./build/industrial_collector config/config.json
+# 打开 http://127.0.0.1:15688 （config.json 里 web.port 决定）
+```
+
+加两个开发期常用的开关：
+
+```bash
+./build/industrial_collector config/config.json --debug --web-port 15688
+#                                                ^^^^^^^  ^^^^^^^^^^^^^^^^
+#                                                web/ 磁盘  覆盖配置里的端口
+#                                                实时伺服，
+#                                                改前端不用重编
+```
+
+### 场景二：`--from-db`，走"设备规格 + 设备树"
+
+设备表从 `config.db` 的**编译快照**读，`devices[]` 可以是空的。适用于储能站这类
+测点是万级、必须走"设备规格实例化 + 「生效」编译"的场景：
+
+```bash
+# 头一次：把 examples 里的储能站示例导入库
+bash examples/ess_models.sh                 # 建 6 个设备规格 + 4×RACK001 + 4×RACK002
+curl -s -X POST http://127.0.0.1:15688/api/compile -d '{}'   # 编出 v1 快照
+
+# 然后正式跑：
+./build/industrial_collector examples/ess.config.json --from-db --debug
+```
+
+`ess.config.json` 里 `devices[]` 故意留空—— main 会明确报错并提示要加
+`--from-db`，避免"忘记加参数结果谁都不采"这种静默失败。
+
+### 场景三：六协议测试环境（Docker 模拟器 + 本机采集器）
+
+一键起完整测试环境（MQTT broker、六协议模拟器、IEC61850 服务端、DLT645 PTY 桥）：
+
+```bash
+bash test/run_test.sh up      # 起模拟器 + 桥
+bash test/run_test.sh run     # 前台跑采集器，Ctrl-C 停
+bash test/run_test.sh sub     # 另开一个窗口订阅 MQTT 看数据
+bash test/run_test.sh down    # 停全部（模拟器 + 桥；采集器 Ctrl-C 自己停）
+```
+
+或者手工同时跑两个实例，一个跑六协议、一个跑储能站：
+
+```bash
+bash test/run_test.sh up
+./build/industrial_collector test/docker/config.docker.json --debug &   # 15647
+./build/industrial_collector examples/ess.config.json --from-db --debug &  # 15688
+```
+
+### 停止 ⚠️
+
+**别用 `pkill -f industrial_collector`**——这个模式会匹到发起命令的 shell 自身
+的命令行，把 shell 也一起打死（本项目多次踩过这个坑）。用**监听端口反查 PID**，
+再核对 `/proc/PID/exe` 确认是本二进制，然后 `kill -TERM`：
+
+```bash
+# 停单个端口的实例
+port=15688
+pid=$(ss -lntpH "sport = :$port" | grep -o 'pid=[0-9]*' | head -1 | cut -d= -f2)
+[ "$(readlink /proc/$pid/exe | sed 's/ (deleted)//')" \
+   = "$(realpath ./build/industrial_collector)" ] \
+  && kill -TERM $pid \
+  || echo "  ⚠ pid $pid 不是本采集器，跳过"
+```
+
+或者用 `test/run_test.sh` 的封装：
+
+```bash
+bash test/run_test.sh down
+```
+
+**关于 SIGTERM 的响应**：主循环里的三种采集器（Modbus/IEC104/…、DLT 总线、CAN
+被动监听）都用 200ms 分片的可中断 sleep，SIGTERM 到达后**亚秒级**退出（实测
+最长 1.4 秒，一次连接尝试的超时）。若 60 秒仍未退出再 `kill -KILL`——那多半
+是链路层卡在 recv，属需查的问题。
+
+### 常用启动参数
+
+| 参数 | 作用 |
+|---|---|
+| `--web-port PORT` | 覆盖 `config.web.port`，其他一律走文件 |
+| `--debug` | 前端从磁盘 `web/` 实时伺服，改完刷新即可，无需重编（生产别开） |
+| `--from-db` | 采集源改用 `config.db` 的编译快照；未加时仍按 `config.json.devices[]` 采集 |
+
+以下不带任何参数，默认读 `config/config.json`：
+
+```bash
+./build/industrial_collector             # ← 等价于 ./build/industrial_collector config/config.json
 ```
 
 ---
